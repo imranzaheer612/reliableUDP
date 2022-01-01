@@ -271,7 +271,7 @@ int main(int argc, char const *argv[])
 	puts("[+]Receiving file from the clinet.");
 	// file = open(recVideoFile, O_RDWR | O_CREAT, 0755);
 
-    output_file = fopen("outUDP.mp4", "wb");
+    output_file = fopen("testFiles/outUDP.mp4", "wb");
 
 	rescOverR_Udp();
   	

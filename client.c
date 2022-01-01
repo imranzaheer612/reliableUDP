@@ -270,7 +270,7 @@ int main(int argc , char *argv[]) {
         printf("setsockopt failed\n");
    
 
-   fp = fopen("sampleVideo.mp4", "rb"); 
+   fp = fopen("testFiles/sampleVideo.mp4", "rb"); 
    if (fp == NULL) 
       printf("[-]File open failed!\n"); 
    else
