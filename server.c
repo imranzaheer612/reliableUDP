@@ -9,6 +9,7 @@
 #include <pthread.h>
 
 
+#define VIDEO_FILE "testFiles/outUDP.mp4"
 #define PORT 8080
 #define BUFFER_SIZE 500
 #define WINDOW_SIZE 5
@@ -41,66 +42,22 @@ int addrlen = sizeof(address);
 char buffer[BUFFER_SIZE];
 FILE *output_file;
 
-
-
 int seq_num = 0;
 struct ackPacket ack;
 int last_acked_in_sequence; 
 bool eof_reached;
-struct Packet window[WINDOW_SIZE];
-
 bool eof_reached = false;
 
-
-void printWindow();
-
-
-void addPacket() {
-   /* shifting array elements */
-   n = WINDOW_SIZE;
-   for(int i=0; i < n-1; i++){
-      window[i] = window[i+1];
-   }
-	// puts("testing");
-
-   struct Packet nullPkt;
-   nullPkt.seqNum = -2;
-   window[n-1] = nullPkt;
-}
+struct Packet window[WINDOW_SIZE];
 
 
-void printAckWindow() {
-	printf("[");
-	for (int i = 0; i < WINDOW_SIZE; i++)
-	{
-		printf("%d, ", window[i].ack);
-	}
-	printf("]\n");
-	
-}
+void rescOverR_Udp();
+void recvOverUDP();
+void threadSendAck();
+void initWindowSeq();
+void slideWindow(int steps);
+void addPacket();
 
-void slideWindow(int steps) {
-
-	// printf("steps: %d\n", steps);
-   for (int i = 0; i < steps; i++)
-   {
-		struct Packet packet = window[i];
-		printf("writting: %d\n", packet.seqNum);
-		
-		size_t num_write = fwrite(&packet.data, 1, packet.size, output_file);
-
-		
-		if (num_write == 0) {
-			packet.eof = true;
-			break;
-		}
-	}
-
-	for (int i = 0; i < WINDOW_SIZE; i++)
-	{
-		addPacket();
-	}
-}
 
 
 void socketConnection() {
@@ -120,9 +77,7 @@ void socketConnection() {
 	address.sin_addr.s_addr = INADDR_ANY;
 	address.sin_port = htons( PORT );
 	
-
 	// Binding
-
 	if (bind(udpSocket, (struct sockaddr *)&address, sizeof(address))<0) {
 		perror("[-]bind failed");
 		exit(EXIT_FAILURE);
@@ -131,19 +86,9 @@ void socketConnection() {
 }
 
 /**
- * Reading segments till 0 bytes received from client
+ * operations to receive udp reliably
 */
-
-
-void initWindowSeq();
-void recvOverUDP();
-void threadSendAck();
-void checkAckWindow();
-// void *send_ack(struct Packet *packet);
-
-
 void rescOverR_Udp() {
-
 	num_of_pkt_wait_for = WINDOW_SIZE;
 	initWindowSeq();
 	
@@ -156,6 +101,7 @@ void rescOverR_Udp() {
 		goto rescAgain;
 	}
 
+	// if eof not reached then continue
 	if (eof_reached == false) {
 		slideWindow(WINDOW_SIZE);
 		rescOverR_Udp();
@@ -165,44 +111,29 @@ void rescOverR_Udp() {
 	else {
 		slideWindow(num_of_pkt_wait_for+1);
 	}
-
 }
 
 /**
  * init a pkt array to be received 
 */
-
 void initWindowSeq() {
 	seq_num = 0;
-
-	for (int i = 0; i < WINDOW_SIZE; i++)
-	{
-			struct Packet newPkt;
-			newPkt.seqNum = seq_num;
-			newPkt.received = false;
-			seq_num++;
-			window[i] = newPkt;
+	for (int i = 0; i < WINDOW_SIZE; i++) {
+		struct Packet newPkt;
+		newPkt.seqNum = seq_num;
+		newPkt.received = false;
+		seq_num++;
+		window[i] = newPkt;
 	}
 }
 
-
-void printWindow() {
-	puts("Accepted seq nums: ");
-	printf("[");
-	for (int i = 0; i < WINDOW_SIZE; i++)
-	{
-		printf("%d, ", window[i].seqNum);
-	}
-	printf("]\n");
-	
-}
-
+/**
+ * send the acks for the packets
+ * that are received accordingly
+ * --> ignore the duplicate packets
+*/
 void recvOverUDP() {
-   bzero(buffer, sizeof(buffer));
-//    printWindow();
-
    for (int i = 0; i < num_of_pkt_wait_for; i++) {
-
 		struct Packet newPacket;
 		newPacket.eof = false;
 
@@ -235,28 +166,46 @@ void recvOverUDP() {
 
 		if (newPacket.size < 0) // Error
 		perror("[-]ERROR writing to socket");
-      
    }
 }
 
+/**
+ * pushing a new packet to the window arr
+*/
+void addPacket() {
+   /* shifting array elements */
+   n = WINDOW_SIZE;
+   for(int i=0; i < n-1; i++){
+      window[i] = window[i+1];
+   }
 
+   struct Packet nullPkt;
+   nullPkt.seqNum = -2;
+   window[n-1] = nullPkt;
+}
 
-void checkAckWindow() {
-   for (int i = 0; i < WINDOW_SIZE; i++)
-   {
-		// printf("pkt ackted: %d", window[i].ack);
-		if (window[i].ack == true)
-			last_acked_in_sequence = i;
-		else {
+/**
+ * slides the window
+ * --> init with new packets
+ * --> write down the previous packets on the file
+*/
+void slideWindow(int steps) {
+   for (int i = 0; i < steps; i++) {
+		struct Packet packet = window[i];
+		printf("writting: %d\n", packet.seqNum);
+		
+		size_t num_write = fwrite(&packet.data, 1, packet.size, output_file);
+
+		if (num_write == 0) {
+			packet.eof = true;
 			break;
 		}
-   }
+	}
+
+	for (int i = 0; i < WINDOW_SIZE; i++) {
+		addPacket();
+	}
 }
-
-
-
-int main(int argc, char const *argv[])
-{
 
 
 /**
@@ -264,18 +213,18 @@ int main(int argc, char const *argv[])
  * TRANSFER FILE OVER UDP
  * 
 */
+int main(int argc, char const *argv[])
+{
 	puts("\n");
 	puts("USING UDP CONNECTION");
 	socketConnection();
 	puts("[+]Client found");
 	puts("[+]Receiving file from the clinet.");
-	// file = open(recVideoFile, O_RDWR | O_CREAT, 0755);
 
-    output_file = fopen("testFiles/outUDP.mp4", "wb");
+    output_file = fopen(VIDEO_FILE, "wb");
 
 	rescOverR_Udp();
-  	
-	  
+  		  
 	puts("[+]File is received and saved in outUDP.mp3.");
 	if (output_file != NULL)  
 		fclose(output_file);
