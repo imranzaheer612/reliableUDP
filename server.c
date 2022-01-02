@@ -156,6 +156,14 @@ void recvOverUDP() {
 			printf("Ack sent: %d\n",num);
 			num_of_acked_pkts++;
 		}
+		
+		// send ack for duplicate packets
+		else if (window[num].received) {
+			struct ackPacket ack;
+			ack.seqNum = num;
+			ack.eof = newPacket.eof;
+			int n = sendto(udpSocket, &ack, sizeof(ack), MSG_CONFIRM, (const struct sockaddr *) &address, addrlen);
+		}
 
 		if (newPacket.eof == true) {
 			printf("eof seq num %d\n", newPacket.seqNum);

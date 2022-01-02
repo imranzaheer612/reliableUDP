@@ -23,10 +23,11 @@ The protocol is made reliable using the following techniques:
 ```
 git clone https://github.com/imranzaheer612/reliableUDP.git
 ```
-* change dir to reliableUDP then specify the port number and the video file you want to use in **client.c and server.c** 
+* change dir to reliableUDP then specify the port number and the video file you want to use in **client.c and server.c** . Also change the server ip in case of LAN.
 ```
-#define VIDEO_FILE "testFiles/outUDP.mp4"
+#define VIDEO_FILE "testFiles/sampleVideo.mp4"
 #define PORT 8080
+#define SERVER_ADDR "192.168.239.128"
 ```  
 
 ### Executing program

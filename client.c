@@ -15,8 +15,8 @@
 
 #define VIDEO_FILE "testFiles/sampleVideo.mp4"
 #define PORT 8080
-#define BUFFER_SIZE 500
 #define SERVER_ADDR "127.0.0.1"
+#define BUFFER_SIZE 500
 #define WINDOW_SIZE 5
 
 
@@ -145,7 +145,7 @@ void wait_ack(){
    int n;
    for (int i = 0; i < acks_to_wait; i++)
    {
-      wait_for_ack:
+      wait_for_ack: ;
       struct ackPacket newAck;
       n = recvfrom(udpSocket, &newAck, sizeof(&newAck), 0,  (struct sockaddr *) &server, &addrlen);
       if (n < 0) 
